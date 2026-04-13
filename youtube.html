@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pidl - yt downloader and player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+
+        :root {
+            --brand: #1db954;
+            --bg: #090909;
+            --card: #1a1a1a;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .song-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .song-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        #video-container {
+            transition: all 0.5s ease;
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+        }
+
+        #video-container.visible {
+            max-height: 500px;
+            opacity: 1;
+            margin-top: 20px;
+        }
+
+        input { outline: none !important; }
+
+        .loader {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--brand);
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #download-menu {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 10px;
+            z-index: 100;
+            width: 200px;
+        }
+
+        #download-menu.show { display: block; }
+
+        .download-btn {
+            background-color: #ff0000;
+            box-shadow: 0 4px 15px rgba(255, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            transform: scale(1.05);
+            background-color: #cc0000;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <main class="flex-grow flex flex-col items-center px-4 py-8 max-w-2xl mx-auto w-full">
+        <h1 class="text-4xl font-semibold mb-8 tracking-tighter text-white opacity-90">pidl</h1>
+
+        <div class="w-full space-y-4 mb-8">
+            <div class="flex gap-2">
+                <input type="text" id="search-input" placeholder="What do you want to listen to?" 
+                       class="w-full bg-[#121212] border border-white/10 rounded-full px-6 py-3 text-sm focus:border-green-500 transition-colors text-center">
+                <button id="search-button" class="bg-[#1db954] hover:bg-[#1ed760] text-black font-bold rounded-full px-6 py-3 transition-all active:scale-95 text-sm">
+                    Search
+                </button>
+            </div>
+        </div>
+
+        <div id="song-results" class="w-full space-y-2 mb-8"></div>
+
+        <div id="player-ui" class="hidden w-full glass rounded-3xl p-6 mb-12 relative">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex-grow mr-4">
+                    <h3 id="song-title" class="font-semibold text-lg truncate text-white">Title</h3>
+                    <p id="status-msg" class="text-xs text-white/40 tracking-tight">Ready to play</p>
+                </div>
+                <div class="flex gap-3">
+                    <button id="toggle-video" class="text-white/40 hover:text-white text-xs underline uppercase tracking-tighter">Video</button>
+                </div>
+            </div>
+
+            <div id="video-container">
+                <iframe id="youtube-player" class="w-full aspect-video rounded-xl shadow-2xl" frameborder="0" allow="autoplay; encrypted-media"></iframe>
+            </div>
+
+            <div class="flex flex-col gap-6 mt-6 items-center">
+                <div class="flex justify-center items-center gap-6">
+                    <button id="play-pause-button" class="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg">
+                        <svg id="play-icon" viewBox="0 0 24 24" class="w-6 h-6 fill-current"><path d="M8 5v14l11-7z"/></svg>
+                        <svg id="pause-icon" viewBox="0 0 24 24" class="w-6 h-6 fill-current hidden"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    </button>
+                </div>
+
+                <div class="w-full flex flex-col items-center gap-2 relative">
+                    <p class="text-[10px] text-white/30 uppercase tracking-widest">Options</p>
+                    
+                    <div id="download-wrapper" class="relative">
+                        <div id="download-menu" class="glass rounded-xl p-2 shadow-2xl overflow-hidden">
+                            <div class="text-[10px] text-white/40 px-3 py-1 border-b border-white/10 mb-1">Select Format</div>
+                            <div id="format-list" class="space-y-1"></div>
+                        </div>
+                        
+                        <button id="main-download-btn" class="download-btn text-white font-bold rounded-full px-8 py-3 transition-all flex items-center gap-2 text-sm">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg>
+                            <span id="dl-btn-text">DOWNLOAD</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="w-full text-center py-6 text-[10px] text-white/20 uppercase tracking-[0.2em]">
+        pidl by redretep &bull; music for everyone
+    </footer>
+
+    <script>
+        // --- Configurations from Userscript ---
+        const FORMAT_LABEL = {'18':'MP4 360p','22':'MP4 720p','140':'M4A 128kbps (Audio)'};
+        const FORMAT_TYPE = {'18':'mp4','22':'mp4','140':'m4a'};
+        const i18n = { 'en': 'DOWNLOAD', 'de': 'HERUNTERLADEN', 'es': 'DESCARGAR', 'fr': 'TÉLÉCHARGER' };
+        const userLang = (navigator.language || 'en').split('-')[0];
+        const labelText = i18n[userLang] || 'DOWNLOAD';
+
+        let isPlaying = false;
+        let currentVideoId = "";
+        let videoVisible = false;
+
+        const searchBtn = document.getElementById("search-button");
+        const searchInput = document.getElementById("search-input");
+        const resultsBox = document.getElementById("song-results");
+        const playerUI = document.getElementById("player-ui");
+        const videoContainer = document.getElementById("video-container");
+        const ytPlayer = document.getElementById("youtube-player");
+        const formatList = document.getElementById("format-list");
+        const downloadMenu = document.getElementById("download-menu");
+        const mainDownloadBtn = document.getElementById("main-download-btn");
+
+        document.getElementById("dl-btn-text").textContent = labelText;
+
+        searchInput.addEventListener("keypress", (e) => { if (e.key === "Enter") searchBtn.click(); });
+        searchBtn.addEventListener("click", () => { const q = searchInput.value; if (q) searchMusic(q); });
+
+        async function searchMusic(query) {
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '<span class="loader"></span>';
+            const apiKey = 'AIzaSyBEeolrRbBxIfISR-enmqo90aheJ1DgBJ8'; 
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&maxResults=10&key=${apiKey}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                displayResults(data.items || []);
+            } catch (err) {
+                resultsBox.innerHTML = '<p class="text-red-500 text-sm">Search failed.</p>';
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = 'Search';
+            }
+        }
+
+        function displayResults(videos) {
+            resultsBox.innerHTML = '';
+            videos.forEach((v, index) => {
+                const div = document.createElement('div');
+                div.className = "song-card glass flex items-center p-3 rounded-2xl cursor-pointer opacity-0";
+                div.style.animation = `fadeIn 0.4s ease forwards ${index * 0.05}s`;
+                div.innerHTML = `
+                    <img src="${v.snippet.thumbnails.default.url}" class="w-12 h-12 rounded-lg object-cover mr-4">
+                    <div class="flex-grow overflow-hidden">
+                        <div class="text-sm font-medium truncate text-white">${v.snippet.title}</div>
+                        <div class="text-xs text-white/40 truncate">${v.snippet.channelTitle}</div>
+                    </div>`;
+                div.onclick = () => playTrack(v.id.videoId, v.snippet.title);
+                resultsBox.appendChild(div);
+            });
+        }
+
+        function playTrack(id, title) {
+            currentVideoId = id;
+            document.getElementById("song-title").textContent = title;
+            playerUI.classList.remove('hidden');
+            ytPlayer.src = `https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=1`;
+            isPlaying = true;
+            updatePlayBtn();
+            prepareDownloadOptions(id, title);
+            playerUI.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function prepareDownloadOptions(videoId, title) {
+            formatList.innerHTML = '';
+            const baseUrl = `https://tenzaa.com/${userLang === 'en' ? '' : userLang + '/'}`;
+            const videoUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
+
+            // Logic inspired by the userscript to provide multiple formats via a portal
+            const formats = [
+                { id: '140', label: 'Audio (MP3/M4A)' },
+                { id: '22', label: 'Video (720p)' },
+                { id: '18', label: 'Video (360p)' }
+            ];
+
+            formats.forEach(f => {
+                const item = document.createElement('a');
+                item.href = `${baseUrl}youtube?url=${videoUrl}`;
+                item.target = "_blank";
+                item.className = "block px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors";
+                item.innerHTML = `<div class="font-semibold">${f.label}</div>`;
+                formatList.appendChild(item);
+            });
+            
+            document.getElementById("status-msg").textContent = "Formats loaded via Tenzaa logic";
+        }
+
+        mainDownloadBtn.onclick = (e) => {
+            e.stopPropagation();
+            downloadMenu.classList.toggle('show');
+        };
+
+        window.onclick = () => {
+            downloadMenu.classList.remove('show');
+        };
+
+        document.getElementById("toggle-video").onclick = () => {
+            videoVisible = !videoVisible;
+            videoContainer.classList.toggle('visible', videoVisible);
+            document.getElementById("toggle-video").textContent = videoVisible ? "Hide Video" : "Show Video";
+        };
+
+        function updatePlayBtn() {
+            document.getElementById("play-icon").classList.toggle('hidden', isPlaying);
+            document.getElementById("pause-icon").classList.toggle('hidden', !isPlaying);
+        }
+
+        document.getElementById("play-pause-button").onclick = () => {
+            const cmd = isPlaying ? 'pauseVideo' : 'playVideo';
+            ytPlayer.contentWindow.postMessage(`{"event":"command","func":"${cmd}","args":""}`, '*');
+            isPlaying = !isPlaying;
+            updatePlayBtn();
+        };
+    </script>
+</body>
+</html>
