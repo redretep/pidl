@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pidl music</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@uimaxbai/am-lyrics/dist/src/am-lyrics.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #000; color: #fff; font-family: -apple-system, system-ui, sans-serif; overflow: hidden; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .bg-gradient { position: fixed; inset: 0; z-index: -1; background: radial-gradient(circle at 20% 30%, #1a1a2c 0%, #000 100%); transition: background 1s ease; }
+        .song-card:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-2px); }
+        input[type="range"] { -webkit-appearance: none; background: rgba(255, 255, 255, 0.1); height: 4px; border-radius: 2px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: #fff; cursor: pointer; }
+        .search-hidden { opacity: 0; pointer-events: none; transform: scale(0.98); transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="h-screen overflow-hidden">
+    <div id="dynamicBg" class="bg-gradient"></div>
+
+    <div id="searchView" class="absolute inset-0 z-10 flex flex-col p-6 pt-12 overflow-y-auto transition-all duration-300">
+        <div class="w-full max-w-3xl mx-auto mb-10 text-center">
+            <h1 class="text-5xl font-bold mb-8 tracking-tighter">pidl music</h1>
+            <div class="relative group">
+                <input type="text" id="searchInput" placeholder="Search albums or tracks..." class="w-full glass rounded-2xl py-4 px-6 pl-14 focus:outline-none focus:ring-2 focus:ring-white/20 text-lg">
+                <i class="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 opacity-40"></i>
+            </div>
+        </div>
+
+        <div id="resultsWrapper" class="w-full max-w-5xl mx-auto space-y-12 pb-32">
+            <section id="tracksSection" class="hidden">
+                <h2 class="text-2xl font-bold mb-4 px-2">Songs</h2>
+                <div id="tracksGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+            </section>
+            <section id="albumsSection" class="hidden">
+                <h2 class="text-2xl font-bold mb-4 px-2">Albums</h2>
+                <div id="albumsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
+            </section>
+        </div>
+    </div>
+
+    <div id="albumModal" class="fixed inset-0 z-40 glass hidden flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-black/60 rounded-3xl border border-white/10 overflow-hidden flex flex-col md:flex-row h-[85vh]">
+            <div class="md:w-1/3 p-8 flex flex-col items-center border-b md:border-b-0 md:border-r border-white/10">
+                <img id="modalAlbumArt" class="w-48 h-48 md:w-full rounded-xl shadow-2xl mb-6 object-cover">
+                <h2 id="modalAlbumTitle" class="text-2xl font-bold text-center mb-1"></h2>
+                <p id="modalAlbumArtist" class="text-white/50 mb-6 text-center"></p>
+                <button id="downloadAlbumBtn" class="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center">
+                    <i class="fas fa-download mr-2"></i> <span>Download Album</span>
+                </button>
+                <button onclick="window.closeAlbumModal()" class="mt-4 text-sm opacity-50 hover:opacity-100">Close</button>
+            </div>
+            <div class="md:w-2/3 p-6 overflow-y-auto" id="albumTracklist"></div>
+        </div>
+    </div>
+
+    <div id="lyricsOverlay" class="fixed inset-0 z-50 glass hidden flex flex-col md:flex-row p-6 md:p-12 gap-8 items-center">
+        <button id="closeLyrics" class="absolute top-8 left-8 text-2xl opacity-40 hover:opacity-100"><i class="fas fa-chevron-down"></i></button>
+        <div class="md:w-2/5 flex flex-col items-center md:items-start max-w-md w-full">
+            <img id="playerArt" class="w-64 h-64 md:w-96 md:h-96 rounded-2xl shadow-2xl mb-8 object-cover">
+            <div class="w-full text-center md:text-left mb-8">
+                <h2 id="playerTrack" class="text-3xl font-bold truncate"></h2>
+                <p id="playerArtist" class="text-xl text-white/50 truncate"></p>
+            </div>
+            <div class="w-full space-y-6">
+                <input type="range" id="progressBar" value="0" step="0.1" class="w-full cursor-pointer">
+                <div class="flex justify-between text-xs opacity-40 font-mono">
+                    <span id="timeCurrent">0:00</span>
+                    <span id="timeTotal">0:00</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <button class="opacity-40 hover:opacity-100"><i class="fas fa-shuffle"></i></button>
+                    <div class="flex items-center gap-8">
+                        <button class="text-2xl opacity-80"><i class="fas fa-backward-step"></i></button>
+                        <button id="playPauseBtn" class="w-16 h-16 bg-white text-black rounded-full flex items-center justify-center text-2xl hover:scale-105"><i class="fas fa-play ml-1"></i></button>
+                        <button class="text-2xl opacity-80"><i class="fas fa-forward-step"></i></button>
+                    </div>
+                    <button id="downloadTrackBtn" class="opacity-40 hover:opacity-100"><i class="fas fa-download"></i></button>
+                </div>
+                <div class="flex items-center gap-3 opacity-40 hover:opacity-100">
+                    <i class="fas fa-volume-low text-xs"></i>
+                    <input type="range" id="volumeBar" min="0" max="1" step="0.01" value="1" class="flex-1">
+                    <i class="fas fa-volume-high text-xs"></i>
+                </div>
+            </div>
+        </div>
+        <div class="md:w-3/5 h-full w-full overflow-hidden">
+            <am-lyrics id="lyricComponent" autoscroll interpolate highlight-color="#ffffff"></am-lyrics>
+        </div>
+    </div>
+
+    <audio id="audioElement" crossorigin="anonymous"></audio>
+
+    <script type="module">
+        // Import ID3Writer as a module to fix the ReferenceError
+        import { ID3Writer } from 'https://cdn.jsdelivr.net/npm/browser-id3-writer@6.3.1/+esm';
+
+        const API_BASE = "https://qobuz.kennyy.com.br/api";
+        const state = {
+            currentTrack: null,
+            albumTracks: [],
+            isAlbumDownloading: false
+        };
+
+        const dom = {
+            search: document.getElementById('searchInput'),
+            results: document.getElementById('resultsWrapper'),
+            tracksGrid: document.getElementById('tracksGrid'),
+            albumsGrid: document.getElementById('albumsGrid'),
+            tracksSec: document.getElementById('tracksSection'),
+            albumsSec: document.getElementById('albumsSection'),
+            searchView: document.getElementById('searchView'),
+            lyricsView: document.getElementById('lyricsOverlay'),
+            audio: document.getElementById('audioElement'),
+            lyrics: document.getElementById('lyricComponent'),
+            playPause: document.getElementById('playPauseBtn'),
+            progress: document.getElementById('progressBar'),
+            albumModal: document.getElementById('albumModal'),
+            tracklist: document.getElementById('albumTracklist'),
+            dlAlbumBtn: document.getElementById('downloadAlbumBtn')
+        };
+
+        // Expose functions to window for onclick handlers
+        window.playTrack = playTrack;
+        window.openAlbum = openAlbum;
+        window.closeAlbumModal = closeAlbumModal;
+        window.downloadWithMeta = downloadWithMeta;
+
+        dom.search.addEventListener('input', e => {
+            clearTimeout(window.searchTimeout);
+            window.searchTimeout = setTimeout(() => search(e.target.value), 500);
+        });
+
+        async function search(q) {
+            if (q.length < 2) return;
+            const res = await fetch(`${API_BASE}/get-music?q=${encodeURIComponent(q)}&offset=0`);
+            const json = await res.json();
+            if (json.success) renderResults(json.data);
+        }
+
+        function renderResults(data) {
+            dom.tracksSec.classList.toggle('hidden', !data.tracks?.items?.length);
+            dom.albumsSec.classList.toggle('hidden', !data.albums?.items?.length);
+
+            dom.tracksGrid.innerHTML = (data.tracks?.items || []).map(item => `
+                <div class="song-card glass p-3 rounded-xl flex items-center gap-4 cursor-pointer" onclick="playTrack('${item.id}', '${item.title}', '${item.performer.name}', '${item.album.image.large}', ${item.duration}, '${item.album.title.replace(/'/g, "\\'")}')">
+                    <img src="${item.album.image.large}" class="w-12 h-12 rounded-lg object-cover">
+                    <div class="flex-1 min-w-0"><h3 class="font-bold truncate">${item.title}</h3><p class="text-xs opacity-50 truncate">${item.performer.name}</p></div>
+                    <span class="text-xs opacity-30 font-mono">${fmt(item.duration)}</span>
+                </div>
+            `).join('');
+
+            dom.albumsGrid.innerHTML = (data.albums?.items || []).map(item => `
+                <div class="group cursor-pointer" onclick="openAlbum('${item.id}', '${item.title.replace(/'/g, "\\'")}', '${item.artist.name.replace(/'/g, "\\'")}', '${item.image.large}')">
+                    <div class="aspect-square rounded-xl overflow-hidden mb-2 relative shadow-lg">
+                        <img src="${item.image.large}" class="w-full h-full object-cover transition group-hover:scale-105">
+                        <div class="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition"></div>
+                    </div>
+                    <h3 class="font-bold text-sm truncate">${item.title}</h3>
+                    <p class="text-xs opacity-50 truncate">${item.artist.name}</p>
+                </div>
+            `).join('');
+        }
+
+        async function openAlbum(id, title, artist, art) {
+            dom.albumModal.classList.remove('hidden');
+            document.getElementById('modalAlbumArt').src = art;
+            document.getElementById('modalAlbumTitle').innerText = title;
+            document.getElementById('modalAlbumArtist').innerText = artist;
+            dom.tracklist.innerHTML = '<p class="opacity-50">Loading tracks...</p>';
+            
+            try {
+                const res = await fetch(`${API_BASE}/get-music?q=${encodeURIComponent(title + ' ' + artist)}&offset=0`);
+                const json = await res.json();
+                state.albumTracks = json.data.tracks.items;
+                
+                dom.tracklist.innerHTML = state.albumTracks.map((t, i) => `
+                    <div class="flex items-center gap-4 p-3 hover:bg-white/5 rounded-lg group cursor-pointer" onclick="playTrack('${t.id}', '${t.title.replace(/'/g, "\\'")}', '${t.performer.name.replace(/'/g, "\\'")}', '${art}', ${t.duration}, '${title.replace(/'/g, "\\'")}')">
+                        <span class="w-6 text-xs opacity-30 font-mono">${i+1}</span>
+                        <div class="flex-1"><p class="font-medium">${t.title}</p></div>
+                        <span class="text-xs opacity-30">${fmt(t.duration)}</span>
+                        <button onclick="event.stopPropagation(); downloadWithMeta('${t.id}', '${t.title.replace(/'/g, "\\'")}', '${t.performer.name.replace(/'/g, "\\'")}', '${title.replace(/'/g, "\\'")}', '${art}')" class="opacity-0 group-hover:opacity-60 hover:opacity-100 p-2"><i class="fas fa-download"></i></button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                dom.tracklist.innerHTML = '<p class="text-red-500">Failed to load tracks.</p>';
+            }
+        }
+
+        async function playTrack(id, title, artist, art, duration, albumTitle) {
+            state.currentTrack = { id, title, artist, art, albumTitle };
+            dom.searchView.classList.add('search-hidden');
+            dom.lyricsView.classList.remove('hidden');
+            document.getElementById('playerArt').src = art;
+            document.getElementById('playerTrack').innerText = title;
+            document.getElementById('playerArtist').innerText = artist;
+            
+            dom.lyrics.setAttribute('song-title', title);
+            dom.lyrics.setAttribute('song-artist', artist);
+            dom.lyrics.setAttribute('song-duration', duration * 1000);
+            dom.lyrics.setAttribute('query', `${title} - ${artist}`);
+            
+            dom.playPause.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            try {
+                const res = await fetch(`${API_BASE}/download-music?track_id=${id}&quality=6`);
+                const json = await res.json();
+                const url = json.url || json.data?.url;
+                if (url) {
+                    dom.audio.src = url;
+                    dom.audio.play();
+                }
+            } catch (e) {
+                dom.playPause.innerHTML = '<i class="fas fa-play ml-1"></i>';
+            }
+        }
+
+        async function getWithMetadata(id, title, artist, album, artUrl) {
+            try {
+                const res = await fetch(`${API_BASE}/download-music?track_id=${id}&quality=6`);
+                const json = await res.json();
+                const streamUrl = json.url || json.data?.url;
+                if (!streamUrl) return null;
+
+                const [songRes, coverRes] = await Promise.all([
+                    fetch(streamUrl),
+                    fetch(artUrl)
+                ]);
+
+                const songBuffer = await songRes.arrayBuffer();
+                const coverBuffer = await coverRes.arrayBuffer();
+
+                const writer = new ID3Writer(songBuffer);
+                writer.setFrame('TIT2', title)
+                      .setFrame('TPE1', [artist])
+                      .setFrame('TALB', album)
+                      .setFrame('APIC', {
+                          type: 3,
+                          data: coverBuffer,
+                          description: 'Cover'
+                      });
+                writer.addTag();
+                return writer.getBlob();
+            } catch (e) {
+                console.error("Meta Error:", e);
+                return null;
+            }
+        }
+
+        async function downloadWithMeta(id, title, artist, album, artUrl) {
+            const blob = await getWithMetadata(id, title, artist, album, artUrl);
+            if (blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${artist} - ${title}.mp3`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        async function downloadAlbum() {
+            if (state.isAlbumDownloading || !state.albumTracks.length) return;
+            
+            state.isAlbumDownloading = true;
+            const btnSpan = dom.dlAlbumBtn.querySelector('span');
+            btnSpan.innerText = "Writing Meta...";
+            dom.dlAlbumBtn.classList.add('opacity-50');
+
+            const zip = new JSZip();
+            const albumName = document.getElementById('modalAlbumTitle').innerText;
+            const artUrl = document.getElementById('modalAlbumArt').src;
+            const folder = zip.folder(albumName);
+
+            try {
+                const downloadPromises = state.albumTracks.map(async (track, index) => {
+                    const blob = await getWithMetadata(track.id, track.title, track.performer.name, albumName, artUrl);
+                    if (blob) {
+                        const name = `${(index + 1).toString().padStart(2, '0')} ${track.title}.mp3`;
+                        folder.file(name, blob);
+                    }
+                });
+
+                await Promise.all(downloadPromises);
+                const content = await zip.generateAsync({ type: "blob" });
+                const zipUrl = URL.createObjectURL(content);
+                
+                const a = document.createElement('a');
+                a.href = zipUrl;
+                a.download = `${albumName}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(zipUrl);
+            } finally {
+                state.isAlbumDownloading = false;
+                btnSpan.innerText = "Download Album";
+                dom.dlAlbumBtn.classList.remove('opacity-50');
+            }
+        }
+
+        dom.dlAlbumBtn.onclick = downloadAlbum;
+        document.getElementById('downloadTrackBtn').onclick = () => {
+            if (!state.currentTrack) return;
+            const { id, title, artist, albumTitle, art } = state.currentTrack;
+            downloadWithMeta(id, title, artist, albumTitle, art);
+        };
+
+        function closeAlbumModal() { dom.albumModal.classList.add('hidden'); }
+        document.getElementById('closeLyrics').onclick = () => { dom.lyricsView.classList.add('hidden'); dom.searchView.classList.remove('search-hidden'); };
+        dom.playPause.onclick = () => dom.audio.paused ? dom.audio.play() : dom.audio.pause();
+        dom.audio.onplay = () => { dom.playPause.innerHTML = '<i class="fas fa-pause"></i>'; dom.lyrics.setAttribute('playing', 'true'); updateProgress(); };
+        dom.audio.onpause = () => { dom.playPause.innerHTML = '<i class="fas fa-play ml-1"></i>'; dom.lyrics.setAttribute('playing', 'false'); };
+        dom.audio.onloadedmetadata = () => { dom.progress.max = dom.audio.duration; document.getElementById('timeTotal').innerText = fmt(dom.audio.duration); };
+        dom.progress.oninput = () => dom.audio.currentTime = dom.progress.value;
+        document.getElementById('volumeBar').oninput = (e) => dom.audio.volume = e.target.value;
+
+        function updateProgress() {
+            if (!dom.audio.paused) {
+                dom.lyrics.currentTime = dom.audio.currentTime * 1000;
+                dom.progress.value = dom.audio.currentTime;
+                document.getElementById('timeCurrent').innerText = fmt(dom.audio.currentTime);
+                requestAnimationFrame(updateProgress);
+            }
+        }
+
+        function fmt(s) {
+            const m = Math.floor(s/60);
+            return `${m}:${Math.floor(s%60).toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
