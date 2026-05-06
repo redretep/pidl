@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pidl</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --card-bg: #141414;
+            --accent: #3b82f6;
+            --text-main: #ffffff;
+            --text-dim: #a1a1aa;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            letter-spacing: -2px;
+            margin: 0;
+            background: linear-gradient(to bottom, #fff, #666);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: var(--text-dim);
+            font-weight: 300;
+            margin-top: 0.5rem;
+        }
+
+        .picker-container {
+            display: flex;
+            gap: 1.5rem;
+            max-width: 900px;
+            width: 90%;
+        }
+
+        .card {
+            flex: 1;
+            background: var(--card-bg);
+            border: 1px solid #222;
+            padding: 2.5rem;
+            border-radius: 20px;
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .card:hover {
+            border-color: var(--accent);
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(59, 130, 246, 0.1);
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+            margin: 1rem 0 0.5rem 0;
+            color: var(--text-main);
+        }
+
+        .card p {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            text-align: center;
+            margin: 0;
+        }
+
+        .icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        .badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 0.7rem;
+            background: #222;
+            padding: 4px 8px;
+            border-radius: 6px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Subtle Background Glow */
+        .glow {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: var(--accent);
+            filter: blur(150px);
+            opacity: 0.1;
+            z-index: -1;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="glow"></div>
+
+    <div class="header">
+        <h1>pidl</h1>
+        <p>what do you wanna download</p>
+    </div>
+
+    <div class="picker-container">
+        <a href="https://redretep.github.io/pidl/tv" class="card">
+            <div class="icon">🎬</div>
+            <h2>cinema</h2>
+            <p>movies & tv</p>
+        </a>
+
+        <a href="https://redretep.github.io/pidl/music" class="card">
+            <div class="icon">🎵</div>
+            <h2>music</h2>
+            <p>.flac music and albums</p>
+        </a>
+      
+        <div class="card disabled">
+            <div class="badge">coming soon</div>
+            <div class="icon">📁</div>
+            <h2>other</h2>
+            <p>more stuff</p>
+        </div>
+    </div>
+
+</body>
+</html>
